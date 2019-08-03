@@ -1401,8 +1401,12 @@ function! eskk#_initialize() abort "{{{
         let {varname}.path = expand({varname}.path)
     endfor
 
+    for dict in g:eskk#sub_dictionaries
+        let dict.path = expand(dict.path)
+    endfor
+
     " Show warning if dictionary does not exist.
-    for dict in [g:eskk#dictionary, g:eskk#large_dictionary]
+    for dict in extend([g:eskk#dictionary, g:eskk#large_dictionary], g:eskk#sub_dictionaries)
         if !filereadable(dict.path)
             call eskk#logger#warnf(
                         \   "Cannot read SKK dictionary: %s", dict.path
@@ -1412,6 +1416,7 @@ function! eskk#_initialize() abort "{{{
     endfor
 
 
+    call eskk#util#set_default('g:eskk#sub_dictionaries', [])
     call eskk#util#set_default('g:eskk#backup_dictionary', g:eskk#dictionary.path . '.BAK')
     call eskk#util#set_default('g:eskk#auto_save_dictionary_at_exit', 1)
 
