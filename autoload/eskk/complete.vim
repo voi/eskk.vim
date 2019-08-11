@@ -121,6 +121,13 @@ function! eskk#complete#_add_completed_candidates() abort "{{{
     call dict.remember_word(items[0])
     call eskk#complete#_reset_completed_candidates()
 endfunction "}}}
+function! eskk#complete#has_candidates(base) "{{{
+    try
+        return !empty(eskk#complete#do_complete(a:base))
+    catch
+        return 0
+    endtry
+endfunction "}}}
 function! s:skip_complete(...) abort "{{{
     let findstart = get(a:000, 0, 0)
     if findstart

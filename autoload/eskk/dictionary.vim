@@ -299,7 +299,17 @@ function! s:HenkanResult_get_candidates() abort dict "{{{
         " Look up from dictionaries.
         let user_dict = dict.get_user_dict()
         let system_dict = dict.get_system_dict()
+        let alt_dicts = dict.get_alt_dicts()
         let server_dict = dict.get_server_dict()
+        let alt_dict_results = []
+        for alt_dict in alt_dicts
+            let alt_dict_ret = 
+                    \   alt_dict.search_candidate(self._key, self._okuri_rom)
+
+            if alt_dict_ret[1] !=# -1
+                call add(alt_dict_results, alt_dict_ret)
+            endif
+        endfor
         let user_dict_result =
                     \   user_dict.search_candidate(
                     \       self._key, self._okuri_rom)
@@ -322,6 +332,7 @@ function! s:HenkanResult_get_candidates() abort dict "{{{
         if user_dict_result[1] ==# -1
                     \   && main_dict_result[1] ==# -1
                     \   && empty(registered)
+                    \   && empty(alt_dict_results)
             let self._status = g:eskk#dictionary#HR_NO_RESULT
             throw eskk#dictionary#look_up_error(
                         \   "Can't look up '"
@@ -340,10 +351,10 @@ function! s:HenkanResult_get_candidates() abort dict "{{{
         call self._candidates.append(registered)
 
         " Merge dictionaries(user, large, skkserv).
-        for [result, from_type] in [
+        for [result, from_type] in extend( [
                     \   [user_dict_result, s:CANDIDATE_FROM_USER_DICT],
                     \   [main_dict_result, s:CANDIDATE_FROM_SYSTEM_DICT],
-                    \]
+                    \], map(alt_dict_results, '[v:val, s:CANDIDATE_FROM_SYSTEM_DICT]'))
             if result[1] !=# -1
                 let candidates =
                             \   eskk#dictionary#parse_skk_dict_line(result[0], from_type)
@@ -1372,6 +1383,7 @@ function! s:Dictionary_new(...) abort "{{{
     let user_dict = get(a:000, 0, g:eskk#directory)
     let system_dict = get(a:000, 1, g:eskk#large_dictionary)
     let server_dict = get(a:000, 2, g:eskk#server)
+    let alt_dicts = get(a:000, 3, g:eskk#sub_dictionaries)
     return extend(
                 \   deepcopy(s:Dictionary),
                 \   {
@@ -1384,6 +1396,9 @@ function! s:Dictionary_new(...) abort "{{{
                 \           system_dict.path,
                 \           system_dict.sorted,
                 \           system_dict.encoding,
+                \       ),
+                \       '_alt_dicts': map(deepcopy(alt_dicts),
+                \           's:PhysicalDict_new(v:val.path, v:val.sorted, v:val.encoding)'
                 \       ),
                 \       '_server_dict': (!empty(g:eskk#server) ?
                 \                           s:ServerDict_new(server_dict) : {}),
@@ -1650,10 +1665,12 @@ function! s:Dictionary_search_all_candidates(key, okuri, okuri_rom) abort dict "
     if candidates.size() < max_count
         " User dictionary, System dictionary
         try
-            for [physical_dict, from_type] in [
+            for [physical_dict, from_type] in extend([
                         \   [self._user_dict, s:CANDIDATE_FROM_USER_DICT],
                         \   [self._system_dict, s:CANDIDATE_FROM_SYSTEM_DICT],
-                        \]
+                        \],
+                        \   map(deepcopy(self._alt_dicts), '[v:val, s:CANDIDATE_FROM_SYSTEM_DICT]')
+                        \)
                 for line in physical_dict.search_all_candidates(
                             \   key, okuri_rom, max_count - candidates.size()
                             \)
@@ -1689,6 +1706,10 @@ endfunction "}}}
 function! s:Dictionary_get_system_dict() abort dict "{{{
     return self._system_dict
 endfunction "}}}
+" Getter for self._alt_dicts
+function! s:Dictionary_get_alt_dicts() abort dict "{{{
+    return self._alt_dicts
+endfunction "}}}
 " Getter for self._server_dict
 function! s:Dictionary_get_server_dict() abort dict "{{{
     return self._server_dict
@@ -1703,6 +1724,7 @@ endfunction "}}}
 let s:Dictionary = {
             \   '_user_dict': {},
             \   '_system_dict': {},
+            \   '_alt_dicts': [],
             \   '_registered_words': {},
             \   '_current_henkan_result': {},
             \
@@ -1722,6 +1744,7 @@ let s:Dictionary = {
             \   'get_user_dict': eskk#util#get_local_funcref('Dictionary_get_user_dict', s:SID_PREFIX),
             \   'get_system_dict': eskk#util#get_local_funcref('Dictionary_get_system_dict', s:SID_PREFIX),
             \   'get_server_dict': eskk#util#get_local_funcref('Dictionary_get_server_dict', s:SID_PREFIX),
+            \   'get_alt_dicts': eskk#util#get_local_funcref('Dictionary_get_alt_dicts', s:SID_PREFIX),
             \   'clear_henkan_result': eskk#util#get_local_funcref('Dictionary_clear_henkan_result', s:SID_PREFIX),
             \}
 
