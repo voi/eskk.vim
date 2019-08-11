@@ -25,6 +25,24 @@ endfunction "}}}
 function! s:get_map_rhs(key) abort "{{{
   return 'eskk#filter(eskk#util#key2char('.string(a:key).'))'
 endfunction "}}}
+function! eskk#map#is_embed_auto_completion(enable_roma) "{{{
+  if mode() ==# 'c' | return 0 | endif
+
+  let l:preedit = eskk#get_preedit()
+  let l:disp_str = l:preedit.get_display_str(0,0)
+  let l:comp = ((l:preedit.get_henkan_phase() !=# g:eskk#preedit#PHASE_NORMAL) &&
+          \ len(l:disp_str))
+
+  if !a:enable_roma
+    let l:comp = l:comp && (l:disp_str ==# l:preedit.get_display_str(0,1))
+  endif
+
+  if l:comp
+    return eskk#complete#has_candidates(l:preedit.get_display_str(1,0))
+  endif
+
+  return 0
+endfunction "}}}
 function! eskk#map#map(options, lhs, rhs, ...) abort "{{{
   if a:lhs ==# '' || a:rhs ==# ''
     call eskk#logger#warnf(
@@ -44,6 +62,13 @@ function! eskk#map#map(options, lhs, rhs, ...) abort "{{{
     let mapcmd = eskk#util#get_map_command(mode, dict, a:lhs, a:rhs)
     if dict.unique
       let mapcmd = 'silent! '.mapcmd
+    endif
+    if get(g:, 'eskk#enable_embed_completion', 1)
+      if stridx('aiueo', a:lhs) >= 0
+        let mapcmd .= '.(eskk#map#is_embed_auto_completion(1)?"\<C-x>\<C-o>\<C-p>":"")'
+      elseif stridx('n', a:lhs) >= 0
+        let mapcmd .= '.(eskk#map#is_embed_auto_completion(0)?"\<C-x>\<C-o>\<C-p>":"")'
+      endif
     endif
     try
       execute mapcmd
